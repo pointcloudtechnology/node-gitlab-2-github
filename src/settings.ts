@@ -22,6 +22,7 @@ export default interface Settings {
   useIssueImportAPI: boolean;
   usePlaceholderMilestonesForMissingMilestones: boolean;
   usePlaceholderIssuesForMissingIssues: boolean;
+  usePlaceholderIssuesForMissingMergeRequests: boolean;
   useReplacementIssuesForCreationFails: boolean;
   useIssuesForAllMergeRequests: boolean;
   filterByLabel?: string;
@@ -32,6 +33,9 @@ export default interface Settings {
     log: boolean;
   };
   s3?: S3Settings;
+  commitmap: {
+    [key: string]: string;
+  };
 }
 
 export interface GithubSettings {

@@ -4,7 +4,7 @@ import {
   SimpleLabel,
   SimpleMilestone,
 } from './githubHelper';
-import { GitlabHelper, GitLabIssue, GitLabMilestone } from './gitlabHelper';
+import { GitlabHelper, GitLabIssue, GitLabMergeRequest, GitLabMilestone } from './gitlabHelper';
 import settings from '../settings';
 
 import { Octokit as GitHubApi } from '@octokit/rest';
@@ -18,6 +18,7 @@ import AWS from 'aws-sdk';
 
 const counters = {
   nrOfPlaceholderIssues: 0,
+  nrOfPlaceholderMergeRequests: 0,
   nrOfReplacementIssues: 0,
   nrOfFailedIssues: 0,
   nrOfPlaceholderMilestones: 0,
@@ -146,6 +147,17 @@ function createPlaceholderIssue(expectedIdx: number): Partial<GitLabIssue> {
     title: `[PLACEHOLDER] - for issue #${expectedIdx}`,
     description:
       'This is to ensure that issue numbers in GitLab and GitHub are the same',
+    state: 'closed',
+    isPlaceholder: true,
+  };
+}
+
+function createPlaceholderMergeRequest(expectedIdx: number): Partial<GitLabMergeRequest> {
+  return {
+    iid: expectedIdx,
+    title: `[PLACEHOLDER] - for mr #${expectedIdx}`,
+    description:
+      'This is to ensure that issue / merge request numbers in GitLab and GitHub are the same',
     state: 'closed',
     isPlaceholder: true,
   };
@@ -413,6 +425,8 @@ async function transferIssues() {
       }
     }
   }
+  
+  await githubHelper.setIDOffset(issues.length);
 
   //
   // Create GitHub issues for each GitLab issue
@@ -422,7 +436,8 @@ async function transferIssues() {
   for (let issue of issues) {
     // try to find a GitHub issue that already exists for this GitLab issue
     let githubIssue = githubIssues.find(
-      i => i.title.trim() === issue.title.trim()
+      //i => i.title.trim() === issue.title.trim()
+	  i => i.number === issue.iid
     );
     if (!githubIssue) {
       console.log(`\nMigrating issue #${issue.iid} ('${issue.title}')...`);
@@ -452,6 +467,8 @@ async function transferIssues() {
             );
           }
         }
+		
+		return undefined;
       }
     } else {
       console.log(`Updating issue #${issue.iid} - ${issue.title}...`);
@@ -506,10 +523,33 @@ async function transferMergeRequests() {
   // get a list of the current issues in the new GitHub repo (likely to be empty)
   // Issues are sometimes created from Gitlab merge requests. Avoid creating duplicates.
   let githubIssues = await githubHelper.getAllGithubIssues();
+  let idOffset = githubIssues.length;
+  await githubHelper.setIDOffset(idOffset);
 
   console.log(
     'Transferring ' + mergeRequests.length.toString() + ' merge requests'
   );
+
+
+  if (settings.usePlaceholderIssuesForMissingMergeRequests) {
+    for (let i = 0; i < mergeRequests.length; i++) {
+      // GitLab issue internal Id (iid)
+      let expectedIdx = i + 1;
+
+      // is there a gap in the GitLab issues?
+      // Create placeholder issues so that new GitHub issues will have the same
+      // issue number as in GitLab. If a placeholder is used it is because there
+      // was a gap in GitLab issues -- likely caused by a deleted GitLab issue.
+      if (mergeRequests[i].iid !== expectedIdx) {
+        mergeRequests.splice(i, 0, createPlaceholderMergeRequest(expectedIdx) as GitLabMergeRequest); // HACK: remove type coercion
+        counters.nrOfPlaceholderMergeRequests++;
+        console.log(
+          `Added placeholder issue for GitLab merge request #${expectedIdx}.`
+        );
+      }
+    }
+  }
+
 
   //
   // Create GitHub pull request for each GitLab merge request
@@ -521,11 +561,13 @@ async function transferMergeRequests() {
     // Try to find a GitHub pull request that already exists for this GitLab
     // merge request
     let githubRequest = githubPullRequests.find(
-      i => i.title.trim() === mr.title.trim()
+      //i => i.title.trim() === mr.title.trim()
+	  i => (i.number - idOffset) === mr.iid
     );
     let githubIssue = githubIssues.find(
       // allow for issues titled "Original Issue Name [merged]"
-      i => i.title.trim().includes(mr.title.trim())
+      //i => i.title.trim().includes(mr.title.trim())
+	  i => i.number === (mr.iid + idOffset)
     );
     if (!githubRequest && !githubIssue) {
       if (settings.skipMergeRequestStates.includes(mr.state)) {
@@ -543,6 +585,7 @@ async function transferMergeRequests() {
           'Could not create pull request: !' + mr.iid + ' - ' + mr.title
         );
         console.error(err);
+		return undefined;
       }
     } else {
       if (githubRequest) {
@@ -562,6 +605,10 @@ async function transferMergeRequests() {
         );
       }
     }
+	
+	console.log(
+    `\tNr. of used placeholder merge requests: ${counters.nrOfPlaceholderMergeRequests}`
+  );
   }
 }
 

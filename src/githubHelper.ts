@@ -70,6 +70,7 @@ export class GithubHelper {
   delayInMs: number;
   useIssuesForAllMergeRequests: boolean;
   milestoneMap?: Map<number, SimpleMilestone>;
+  idOffset: number;
 
   constructor(
     githubApi: GitHubApi,
@@ -90,6 +91,7 @@ export class GithubHelper {
     this.gitlabHelper = gitlabHelper;
     this.delayInMs = 2000;
     this.useIssuesForAllMergeRequests = useIssuesForAllMergeRequests;
+    this.idOffset = 0;
   }
 
   /*
@@ -97,6 +99,10 @@ export class GithubHelper {
    ******************************** GET METHODS *********************************
    ******************************************************************************
    */
+
+ async setIDOffset(offset: number) {
+    this.idOffset = offset;
+  }
 
   /**
    * Store the new repo id
@@ -1148,9 +1154,23 @@ export class GithubHelper {
     const hasProjectmap =
       settings.projectmap !== null &&
       Object.keys(settings.projectmap).length > 0;
+	const hasCommitmap =
+      settings.commitmap !== null && Object.keys(settings.commitmap).length > 0;
 
     if (add_line) str = GithubHelper.addMigrationLine(str, item, repoLink);
     let reString = '';
+
+	//
+    // Commit reference conversion
+    //
+
+    if (hasCommitmap) {
+      reString = Object.keys(settings.commitmap).join('|');
+      str = str.replace(
+        new RegExp(reString, 'g'),
+        match => settings.commitmap[match]
+      );
+    }
 
     //
     // User name conversion
@@ -1170,7 +1190,8 @@ export class GithubHelper {
 
     let issueReplacer = (match: string) => {
       // TODO: issueMap
-      return '#' + match;
+	  return '#' + match;
+      //return match;
     };
 
     if (hasProjectmap) {
@@ -1178,7 +1199,8 @@ export class GithubHelper {
         '(' + Object.keys(settings.projectmap).join(')#(\\d+)|(') + ')#(\\d+)';
       str = str.replace(
         new RegExp(reString, 'g'),
-        (_, p1, p2) => settings.projectmap[p1] + '#' + issueReplacer(p2)
+        //(_, p1, p2) => settings.projectmap[p1] + '#' + issueReplacer(p2)
+		(_, p1, p2) => settings.projectmap[p1] + issueReplacer(p2)
       );
     }
     reString = '(?<=\\W)#(\\d+)';
@@ -1283,6 +1305,24 @@ export class GithubHelper {
     // MR reference conversion
     //
     // TODO
+	
+    let mrReplacer = (match: string) => {
+      // TODO: mrMap
+	  return '#' + (parseInt(match) + this.idOffset);
+      //return match;
+    };
+
+    if (hasProjectmap) {
+      reString =
+        '(' + Object.keys(settings.projectmap).join(')!(\\d+)|(') + ')!(\\d+)';
+      str = str.replace(
+        new RegExp(reString, 'g'),
+        //(_, p1, p2) => settings.projectmap[p1] + '#' + mrReplacer(p2)
+		(_, p1, p2) => settings.projectmap[p1] + mrReplacer(p2)
+      );
+    }
+    reString = '(?<=\\W)!(\\d+)';
+    str = str.replace(new RegExp(reString, 'g'), (_, p1) => mrReplacer(p1));
 
     str = await utils.migrateAttachments(
       str,
