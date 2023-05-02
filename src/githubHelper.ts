@@ -478,6 +478,11 @@ export class GithubHelper {
     }
 
     const issue_number = await this.requestImportIssue(props, comments);
+	if(issue_number == null)
+	{
+		throw Error('requestImportIssue failed :-(');
+	}
+	console.log(issue_number)
 
     if (assignees.length > 1 && issue_number) {
       if (assignees.length > 10) {
@@ -938,6 +943,7 @@ export class GithubHelper {
       };
 
       console.log('\tMigrating pull request comments...');
+	  console.log(mergeRequest.iid);
       let comments: CommentImport[] = [];
 
       if (!mergeRequest.iid) {
@@ -945,10 +951,16 @@ export class GithubHelper {
           '\t...this is a placeholder for a deleted GitLab merge request, no comments are created.'
         );
       } else {
-        let notes = await this.gitlabHelper.getAllMergeRequestNotes(
-          mergeRequest.iid
-        );
-        comments = await this.processNotesIntoComments(notes);
+		try{
+			let notes = await this.gitlabHelper.getAllMergeRequestNotes(
+			  mergeRequest.iid
+			);
+			comments = await this.processNotesIntoComments(notes);
+		} catch (err) {
+			console.log(
+				'\t...this is a placeholder for a deleted GitLab merge request, no comments are created.'
+			);
+		}
       }
 
       return this.requestImportIssue(props, comments);

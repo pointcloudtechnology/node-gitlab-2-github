@@ -468,7 +468,7 @@ async function transferIssues() {
           }
         }
 		
-		return undefined;
+		//return undefined;
       }
     } else {
       console.log(`Updating issue #${issue.iid} - ${issue.title}...`);
@@ -506,6 +506,11 @@ async function transferMergeRequests() {
 
   await githubHelper.registerMilestoneMap();
 
+  let issues = (await gitlabApi.Issues.all({
+    projectId: settings.gitlab.projectId,
+    labels: settings.filterByLabel,
+  })) as GitLabIssue[];
+
   // Get a list of all pull requests (merge request equivalent) associated with
   // this project
   let mergeRequests = await gitlabApi.MergeRequests.all({
@@ -523,7 +528,8 @@ async function transferMergeRequests() {
   // get a list of the current issues in the new GitHub repo (likely to be empty)
   // Issues are sometimes created from Gitlab merge requests. Avoid creating duplicates.
   let githubIssues = await githubHelper.getAllGithubIssues();
-  let idOffset = githubIssues.length;
+  //let idOffset = githubIssues.length;
+  let idOffset = issues.length;
   await githubHelper.setIDOffset(idOffset);
 
   console.log(
@@ -576,13 +582,13 @@ async function transferMergeRequests() {
         );
         continue;
       }
-      console.log('Creating pull request: !' + mr.iid + ' - ' + mr.title);
+      console.log('Creating pull request: !' + mr.iid + " (" + (mr.iid + idOffset) + ")" + ' - ' + mr.title);
       try {
         // process asynchronous code in sequence
         await githubHelper.createPullRequestAndComments(mr);
       } catch (err) {
         console.error(
-          'Could not create pull request: !' + mr.iid + ' - ' + mr.title
+          'Could not create pull request: !' + mr.iid + " (" + (mr.iid + idOffset) + ")" + ' - ' + mr.title
         );
         console.error(err);
 		return undefined;
@@ -591,7 +597,7 @@ async function transferMergeRequests() {
       if (githubRequest) {
         console.log(
           'Gitlab merge request already exists (as github pull request): ' +
-            mr.iid +
+            mr.iid + + " (" + (mr.iid + idOffset) + ")" +
             ' - ' +
             mr.title
         );
@@ -599,7 +605,7 @@ async function transferMergeRequests() {
       } else {
         console.log(
           'Gitlab merge request already exists (as github issue): ' +
-            mr.iid +
+            mr.iid + " (" + (mr.iid + idOffset) + ")" +
             ' - ' +
             mr.title
         );
