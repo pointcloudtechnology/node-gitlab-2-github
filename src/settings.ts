@@ -36,6 +36,9 @@ export default interface Settings {
   commitmap: {
     [key: string]: string;
   };
+  commitmap2: {
+    [key: string]: string;
+  };
 }
 
 export interface GithubSettings {

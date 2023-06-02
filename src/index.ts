@@ -404,11 +404,12 @@ async function transferIssues() {
 
   // get a list of the current issues in the new GitHub repo (likely to be empty)
   let githubIssues = await githubHelper.getAllGithubIssues();
+  let maxIssueID = issues[issues.length - 1].iid;
 
-  console.log(`Transferring ${issues.length} issues.`);
+  console.log(`Transferring ${maxIssueID} issues.`);
 
   if (settings.usePlaceholderIssuesForMissingIssues) {
-    for (let i = 0; i < issues.length; i++) {
+    for (let i = 0; i < maxIssueID; i++) {
       // GitLab issue internal Id (iid)
       let expectedIdx = i + 1;
 
@@ -426,7 +427,7 @@ async function transferIssues() {
     }
   }
   
-  await githubHelper.setIDOffset(issues.length);
+  await githubHelper.setIDOffset(maxIssueID);
 
   //
   // Create GitHub issues for each GitLab issue
@@ -528,8 +529,12 @@ async function transferMergeRequests() {
   // get a list of the current issues in the new GitHub repo (likely to be empty)
   // Issues are sometimes created from Gitlab merge requests. Avoid creating duplicates.
   let githubIssues = await githubHelper.getAllGithubIssues();
+  
   //let idOffset = githubIssues.length;
-  let idOffset = issues.length;
+  //let idOffset = issues.length;
+  // sort issues in ascending order of their issue number (by iid)
+  issues = issues.sort((a, b) => a.iid - b.iid);
+  let idOffset = issues[issues.length - 1].iid;
   await githubHelper.setIDOffset(idOffset);
 
   console.log(

@@ -841,9 +841,10 @@ export class GithubHelper {
         if (gitlabBranches.find(m => m.name === mergeRequest.target_branch)) {
           // Need to move that branch over to GitHub!
           console.error(
-            `The '${mergeRequest.target_branch}' branch exists on GitLab but has not been migrated to GitHub. Please migrate the branch before migrating pull request #${mergeRequest.iid}.`
+            `The '${mergeRequest.target_branch}' target branch exists on GitLab but has not been migrated to GitHub => cannot migrate pull request, creating an issue instead.`
           );
-          return Promise.resolve({ data: null });
+          //return Promise.resolve({ data: null });
+		  canCreate = false;
         } else {
           console.error(
             `Merge request ${mergeRequest.iid} (target branch '${mergeRequest.target_branch}' does not exist => cannot migrate pull request, creating an issue instead.`
@@ -866,15 +867,21 @@ export class GithubHelper {
         if (gitlabBranches.find(m => m.name === mergeRequest.source_branch)) {
           // Need to move that branch over to GitHub!
           console.error(
-            `The '${mergeRequest.source_branch}' branch exists on GitLab but has not been migrated to GitHub. Please migrate the branch before migrating pull request #${mergeRequest.iid}.`
+            `The '${mergeRequest.source_branch}' source branch exists on GitLab but has not been migrated to GitHub => cannot migrate pull request, creating an issue instead.`
           );
-          return Promise.resolve({ data: null });
+          //return Promise.resolve({ data: null });
+		  canCreate = false;
         } else {
           console.error(
             `Pull request #${mergeRequest.iid} (source branch '${mergeRequest.source_branch}' does not exist => cannot migrate pull request, creating an issue instead.`
           );
           canCreate = false;
         }
+		if (false)
+		{
+			// compile fix
+			return Promise.resolve({ data: null });
+		}
       }
     }
 
@@ -891,7 +898,7 @@ export class GithubHelper {
         owner: this.githubOwner,
         repo: this.githubRepo,
         title: mergeRequest.title.trim(),
-        body: bodyConverted,
+        body: '_Former Gitlab-ID: ' +	mergeRequest.iid + '_\n\n' + bodyConverted,
         head: mergeRequest.source_branch,
         base: mergeRequest.target_branch,
       };
@@ -917,7 +924,9 @@ export class GithubHelper {
     // Failing all else, create an issue with a descriptive title
 
     let mergeStr =
-      '_Merges ' +
+      '_Former Gitlab-ID: ' +
+	  mergeRequest.iid + 
+	  '_\n\n_Merges ' +
       mergeRequest.source_branch +
       ' -> ' +
       mergeRequest.target_branch +
@@ -1168,6 +1177,8 @@ export class GithubHelper {
       Object.keys(settings.projectmap).length > 0;
 	const hasCommitmap =
       settings.commitmap !== null && Object.keys(settings.commitmap).length > 0;
+	const has2ndCommitmap =
+      settings.commitmap2 !== null && Object.keys(settings.commitmap2).length > 0;
 
     if (add_line) str = GithubHelper.addMigrationLine(str, item, repoLink);
     let reString = '';
@@ -1177,11 +1188,19 @@ export class GithubHelper {
     //
 
     if (hasCommitmap) {
-      reString = Object.keys(settings.commitmap).join('|');
-      str = str.replace(
-        new RegExp(reString, 'g'),
-        match => settings.commitmap[match]
-      );
+		reString = Object.keys(settings.commitmap).join('|');
+		str = str.replace(
+			new RegExp(reString, 'g'),
+			match => settings.commitmap[match]
+		);
+		
+		if (has2ndCommitmap) {
+			reString = Object.keys(settings.commitmap2).join('|');
+			str = str.replace(
+				new RegExp(reString, 'g'),
+				match => settings.commitmap2[match]
+			);
+		}
     }
 
     //
